@@ -1,12 +1,12 @@
 # Pong
 
-##Current functionality:
+## Current functionality:
 
 1-Player paddle is moveable
 
 2-Ball bounces when hitting paddles
 
-##Need to implement:
+## Need to implement:
 
 1-Bouncing at an angle
 
