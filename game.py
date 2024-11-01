@@ -2,8 +2,9 @@
 import pygame
 from pygame.locals import *
 
-# Import randint method random module
-from random import randint
+import pymunk
+
+import random
 
 # pygame setup
 pygame.init()
@@ -17,7 +18,7 @@ dt = 0
 # Creating a variable for direction
 direction = 1
 # Ball setup
-ball_pos = pygame.Vector2(screen.get_width() / 2, screen.get_height() / 2)
+# ball_pos = pygame.Vector2(screen.get_width() / 2, screen.get_height() / 2)
 # speed = [6, 9]
 firstRun = True
 
@@ -25,54 +26,79 @@ leftTurn = False
 rightTurn = True
 
 
-playerPos = pygame.Vector2(10, 320)
+# playerPos = pygame.Vector2(10, 320)
 
 wall_thickness = 10
 
-#creating objects
-paddle = pygame.image.load("paddle.png").convert_alpha()
-ball = pygame.image.load("ball.png").convert_alpha()
-leftPaddle_rect = paddle.get_rect()
+# creating objects
+
+paddleImage = pygame.image.load("paddle.png")
+ballImage = pygame.image.load("ball.png")
+paddle = paddleImage.convert_alpha()
+ball = ballImage.convert_alpha()
+Paddle_rect = paddle.get_rect()
 ball_rect = ball.get_rect()
 paddle_mask = pygame.mask.from_surface(paddle)
 ball_mask = pygame.mask.from_surface(ball)
 
+space = pymunk.space()
 
-#top and bottom walls
+
+# top and bottom walls
 def draw_walls():
-    top = pygame.draw.line(screen,'white',(0,0),(WIDTH,0),wall_thickness)
-    bottom = pygame.draw.line(screen,'white',(0,HEIGHT),(WIDTH,HEIGHT),wall_thickness)
-    wall_list = [top,bottom]
+    top = pygame.draw.line(screen, "white", (0, 0), (WIDTH, 0), wall_thickness)
+    bottom = pygame.draw.line(
+        screen, "white", (0, HEIGHT), (WIDTH, HEIGHT), wall_thickness
+    )
+    wall_list = [top, bottom]
     return wall_list
 
+
+def convert_coordinates(point):
+    return int(point[0]), 600 - int(point[1])
+
+
 class Ball:
-    def __init__(self, position, radius, color, x_speed,y_speed):
-        self.position=position
-        self.radius=radius
-        self.color=color
-        self.x_speed=x_speed
-        self.y_speed=y_speed
-        self.circle =''
+    def __init__(self, x, y):
+        self.body = pymunk.Body()
+        self.body.position = x, y
+        self.body.velocity = (100, 0)
+        self.shape = pymunk.Circle(self.body, 10)
+        self.collision_type = 1
+        space.add(self.body, self.shape, convert_coordinates(self))
 
     def draw(self):
-        self.circle = pygame.draw.circle(screen, self.color,self.position,self.radius)
+        # self.circle = pygame.draw.circle(
+        #     screen, self.color, (self.x_pos, self.y_pos), self.radius
+        # )
+
+        pygame.draw.circle(
+            screen,
+            "white",
+        )
+
 
 class Paddle:
-    def __init__(self, x_pos, y_pos, color, y_speed):
-        self.x_pos=x_pos
-        self.y_pos=y_pos
-        self.color=color
-        self.y_speed=y_speed
-        self.paddle =''
+    def __init__(self, x_pos, y_pos, color, direction):
+        self.x_pos = x_pos
+        self.y_pos = y_pos
+        self.color = color
+        self.direction = direction
+        # self.y_speed = y_speed
+        self.paddle = ""
 
     def draw(self):
-        self.paddle = screen.blit(paddle, (self.x_pos,self.y_pos))
+        self.paddle = screen.blit(paddle, (self.x_pos, self.y_pos))
 
-ball = Ball(ball_pos,10,"white",1,0)
-newleftPaddle = Paddle(screen.get_width() - 50, screen.get_height() / 2, "white",0)
-newrightPaddle = Paddle(50, screen.get_height() / 2, "white",0)
+
+ball = Ball(screen.get_width() / 2, screen.get_width() / 2, 10, "white", 1, 0)
+newleftPaddle = Paddle(100, HEIGHT / 2, "white", 1)
+newrightPaddle = Paddle(WIDTH - 100, HEIGHT / 2, "white", 1)
 
 draw_walls()
+
+x_pos, y_pos = (5, 0)
+
 
 while running:
     # poll for events
@@ -83,15 +109,14 @@ while running:
 
     # fill the screen with a color to wipe away anything from last frame
     screen.fill("black")
-    
 
     # pygame.draw.rect(screen, "white", leftRect)
     # pygame.draw.rect(screen, "white", rightRect)
     # circle = pygame.draw.circle(screen, "white", ball_pos, 10)
 
     ball.draw()
-    newleftPaddle.draw()
     newrightPaddle.draw()
+    newleftPaddle.draw()
 
     keys = pygame.key.get_pressed()
     if keys[pygame.K_w]:
@@ -99,16 +124,16 @@ while running:
     if keys[pygame.K_s]:
         newleftPaddle.y_pos += 300 * dt
 
+    # collision detection
+    if ball_rect.colliderect(Paddle_rect):
+        ball.direction *= -1
 
-    #collision detection
-    if (ball.position.x == newrightPaddle.x_pos) or (ball.position.x == newleftPaddle.x_pos):
-        ball.position *=-1
-
-
-    # if rightTurn:
-    #     ball_pos[0] += 5
-    # elif leftTurn:
-    #     ball_pos[0] -= 5
+    if rightTurn:
+        ball.x_pos += x_pos
+        ball.y_pos += y_pos
+    elif leftTurn:
+        ball.x_pos -= x_pos
+        ball.y_pos -= y_pos
 
     # collideRight = rightRect.colliderect(circle)
     # collideLeft = leftRect.colliderect(circle)
