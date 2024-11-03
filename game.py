@@ -1,6 +1,8 @@
 # Example file showing a circle moving on screen
 import pygame
 from pygame.locals import *
+import pymunk.pygame_util
+from pymunk import Vec2d
 
 import pymunk
 
@@ -14,34 +16,45 @@ HEIGHT = 720
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 running = True
-dt = 0
-# Creating a variable for direction
-direction = 1
+
 # Ball setup
-# ball_pos = pygame.Vector2(screen.get_width() / 2, screen.get_height() / 2)
-# speed = [6, 9]
+
 firstRun = True
 
-leftTurn = False
-rightTurn = True
-
-
-# playerPos = pygame.Vector2(10, 320)
 
 wall_thickness = 10
 
-# creating objects
 
-paddleImage = pygame.image.load("paddle.png")
-ballImage = pygame.image.load("ball.png")
-paddle = paddleImage.convert_alpha()
-ball = ballImage.convert_alpha()
-Paddle_rect = paddle.get_rect()
-ball_rect = ball.get_rect()
-paddle_mask = pygame.mask.from_surface(paddle)
-ball_mask = pygame.mask.from_surface(ball)
+space = pymunk.Space()
+pymunk.pygame_util.positive_y_is_up = True
+draw_options = pymunk.pygame_util.DrawOptions(screen)
 
-space = pymunk.space()
+collision_types = {
+    "ball": 1,
+    "brick": 2,
+    "bottom": 3,
+    "player": 4,
+}
+
+
+def pre_solve(arbiter, space, data):
+    # We want to update the collision normal to make the bounce direction
+    # dependent of where on the paddle the ball hits. Note that this
+    # calculation isn't perfect, but just a quick example.
+    set_ = arbiter.contact_point_set
+    if len(set_.points) > 0:
+        player_shape = arbiter.shapes[0]
+        width = (player_shape.b - player_shape.a).x
+        delta = (player_shape.body.position - set_.points[0].point_a).x
+        normal = Vec2d(0, 1).rotated(delta / width / 2)
+        set_.normal = normal
+        set_.points[0].distance = 0
+    arbiter.contact_point_set = set_
+    return True
+
+
+h = space.add_collision_handler(collision_types["player"], collision_types["ball"])
+h.pre_solve = pre_solve
 
 
 # top and bottom walls
@@ -55,50 +68,50 @@ def draw_walls():
 
 
 def convert_coordinates(point):
-    return int(point[0]), 600 - int(point[1])
+    return int(point[0]), 720 - int(point[1])
 
 
 class Ball:
     def __init__(self, x, y):
         self.body = pymunk.Body()
         self.body.position = x, y
-        self.body.velocity = (100, 0)
+        self.body.velocity = (200, 0)
         self.shape = pymunk.Circle(self.body, 10)
-        self.collision_type = 1
-        space.add(self.body, self.shape, convert_coordinates(self))
+        self.collision_type = collision_types["ball"]
+        self.shape.elasticity = 1
+        self.shape.density = 1
+        space.add(self.body, self.shape)
+
+    # Keep ball velocity at a static value
+    def constant_velocity(body, gravity, damping, dt):
+        body.velocity = body.velocity.normalized() * 400
 
     def draw(self):
-        # self.circle = pygame.draw.circle(
-        #     screen, self.color, (self.x_pos, self.y_pos), self.radius
-        # )
-
-        pygame.draw.circle(
-            screen,
-            "white",
-        )
+        pygame.draw.circle(screen, "white", convert_coordinates(self.body.position), 10)
 
 
 class Paddle:
-    def __init__(self, x_pos, y_pos, color, direction):
-        self.x_pos = x_pos
-        self.y_pos = y_pos
-        self.color = color
-        self.direction = direction
-        # self.y_speed = y_speed
-        self.paddle = ""
+    def __init__(self, x, y):
+        self.body = pymunk.Body(body_type=pymunk.Body.KINEMATIC)
+        self.body.position = x, y
+        self.shape = pymunk.Poly.create_box(self.body, (20, 10))
+        self.shape.color = Color("white")
+        self.shape.group = 1
+        self.collision_type = collision_types["player"]
+        self.shape.elasticity = 1.0
+        space.add(self.body, self.shape)
 
-    def draw(self):
-        self.paddle = screen.blit(paddle, (self.x_pos, self.y_pos))
 
+h = space.add_collision_handler(collision_types["brick"], collision_types["ball"])
 
-ball = Ball(screen.get_width() / 2, screen.get_width() / 2, 10, "white", 1, 0)
-newleftPaddle = Paddle(100, HEIGHT / 2, "white", 1)
-newrightPaddle = Paddle(WIDTH - 100, HEIGHT / 2, "white", 1)
+ball = Ball(WIDTH / 2, HEIGHT / 2)
+newleftPaddle = Paddle(100, HEIGHT / 2)
+newrightPaddle = Paddle(WIDTH - 100, HEIGHT / 2)
 
 draw_walls()
 
-x_pos, y_pos = (5, 0)
 
+# print(newleftPaddle.shape.color)
 
 while running:
     # poll for events
@@ -120,34 +133,11 @@ while running:
 
     keys = pygame.key.get_pressed()
     if keys[pygame.K_w]:
-        newleftPaddle.y_pos -= 300 * dt
+        newleftPaddle.body.position = (0, -300)
     if keys[pygame.K_s]:
-        newleftPaddle.y_pos += 300 * dt
+        newleftPaddle.body.position = (0, 300)
 
-    # collision detection
-    if ball_rect.colliderect(Paddle_rect):
-        ball.direction *= -1
-
-    if rightTurn:
-        ball.x_pos += x_pos
-        ball.y_pos += y_pos
-    elif leftTurn:
-        ball.x_pos -= x_pos
-        ball.y_pos -= y_pos
-
-    # collideRight = rightRect.colliderect(circle)
-    # collideLeft = leftRect.colliderect(circle)
-
-    # if collideRight:
-    #     leftTurn = True
-    #     rightTurn = False
-
-    # elif collideLeft:
-    #     leftTurn = False
-    #     rightTurn = True
-
-    # pygame.draw.circle(screen, "white", ball_pos, 10)
-    pygame.display.update()
+    pygame.display.flip()
 
     if firstRun == True:
         pygame.time.delay(2000)
@@ -156,6 +146,9 @@ while running:
     # limits FPS to 60
     # dt is delta time in seconds since last frame, used for framerate-
     # independent physics.
-    dt = clock.tick(60) / 1000
+    fps = 60
+    dt = 1.0 / fps
+    space.step(dt)
+    clock.tick(fps)
 
 pygame.quit()
